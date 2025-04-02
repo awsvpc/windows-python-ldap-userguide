@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+    stages {
+        stage('Create Python Script') {
+            steps {
+                script {
+                    // Write the Python script to a file
+                    writeFile file: 'test_domain_controller.py', text: '''
+from ldap3 import Server, Connection, ALL, NTLM
+
+def test_domain_controller(server_address, username, password):
+    try:
+        # Define the server
+        server = Server(server_address, get_info=ALL)
+        print(f"Connecting to server: {server_address}")
+
+        # Establish the connection
+        conn = Connection(server, user=username, password=password, authentication=NTLM)
+        if not conn.bind():
+            print(f"Failed to authenticate: {conn.result}")
+            return False
+
+        print("Successfully authenticated to the domain controller.")
+        conn.unbind()
+        return True
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Replace these with your domain controller details
+    DOMAIN_CONTROLLER = "your.domain.controller"
+    USERNAME = "your_domain\\\\your_username"
+    PASSWORD = "your_password"
+
+    if test_domain_controller(DOMAIN_CONTROLLER, USERNAME, PASSWORD):
+        print("Connection test successful.")
+    else:
+        print("Connection test failed.")
+'''
+                }
+            }
+        }
+        stage('Install Dependencies') {
+            steps {
+                // Install required Python libraries
+                sh 'pip install ldap3'
+            }
+        }
+        stage('Test Domain Controller Connection') {
+            steps {
+                // Execute the Python script
+                sh 'python test_domain_controller.py'
+            }
+        }
+    }
+    post {
+        always {
+            // Archive logs or results
+            archiveArtifacts artifacts: '**/*.log', allowEmptyArchive: true
+        }
+    }
+}
